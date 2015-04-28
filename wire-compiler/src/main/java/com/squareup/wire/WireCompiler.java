@@ -952,12 +952,12 @@ public class WireCompiler {
       if (fullyQualifiedNameIsOutsidePackage(fqName)) {
         extensionClasses.add(fqName);
       }
-      for (FieldElement field : extend.fields()) {
-        String fqFieldType = fullyQualifiedJavaName(null, field.type().toString());
-        if (fullyQualifiedNameIsOutsidePackage(fqFieldType)) {
-          extensionClasses.add(fqFieldType);
-        }
-      }
+      //for (Field field : extend.getFields()) {
+        //String fqFieldType = fullyQualifiedJavaName(null, field.getType());
+        //if (fullyQualifiedNameIsOutsidePackage(fqFieldType)) {
+          //extensionClasses.add(fqFieldType);
+        //}
+      //}
     }
     return extensionClasses;
   }
@@ -1024,6 +1024,20 @@ public class WireCompiler {
     }
   }
 
+  private static String toCamelCase(String s){
+     String[] parts = s.split("_");
+     String camelCaseString = "";
+     for (String part : parts){
+        camelCaseString = camelCaseString + toProperCase(part);
+     }
+     return camelCaseString;
+  }
+
+  private static String toProperCase(String s) {
+      return s.substring(0, 1).toUpperCase() +
+                 s.substring(1).toLowerCase();
+  }
+
   private void emitExtensions(JavaWriter writer) throws IOException {
     for (ExtendElement extend : protoFile.extendDeclarations()) {
       String fullyQualifiedName = extend.qualifiedName();
@@ -1035,13 +1049,29 @@ public class WireCompiler {
       for (FieldElement field : extend.fields()) {
         String fieldType = field.type().toString();
         String type = javaName(null, fieldType);
+        String fqName = prefixWithPackageName(field.getName());
+        String typeWithClassPrefix = fullyQualifiedJavaName(null, field.getType());
+        if (fqName.startsWith("services")) {
+            String[] parts = typeWithClassPrefix.split("\\.");
+            String output = new String();
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == parts.length - 1) {
+                    output += toCamelCase(parts[i - 1]) + part;
+                } else {
+                    output += part;
+                    output += ".";
+                }
+            }
+            typeWithClassPrefix = output;
+        }
         if (type == null) {
           type = javaName(null, prefixWithPackageName(fieldType));
         }
-        type = shortenJavaName(type);
+        type = typeWithClassPrefix;
         String initialValue;
         String className = writer.compressType(name);
-        String extensionName = field.name();
+        String extensionName = ", " + typeWithClassPrefix + "> " + field.name();
         String fqName = prefixWithPackageName(field.name());
         int tag = field.tag();
 
@@ -1071,7 +1101,7 @@ public class WireCompiler {
         if (FieldInfo.isRepeated(field)) {
           type = "List<" + type + ">";
         }
-        writer.emitField("Extension<" + name + ", " + type + ">", extensionName,
+        writer.emitField("Extension<" + name, extensionName,
             EnumSet.of(PUBLIC, STATIC, FINAL), initialValue);
       }
     }
