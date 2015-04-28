@@ -348,7 +348,7 @@ public class WireCompiler {
         String savedType = typeBeingGenerated;
         typeBeingGenerated += type.name() + ".";
         OutputArtifact artifact = new OutputArtifact(options.javaOut, getJavaPackage(),
-            type.name());
+            getClassPrefix() + type.name());
         log.artifact(artifact);
         if (!options.dryRun) {
           emitMessageClass(type, artifact);
@@ -672,6 +672,18 @@ public class WireCompiler {
     return protoFile.packageName() == null ? "" : protoFile.packageName();
   }
 
+  String getClassPrefix(ProtoFile protoFile) {
+      Option classPrefix = Option.findByName(protoFile.getOptions(), "java_class_prefix");
+      if (classPrefix != null) {
+          return (String) classPrefix.getValue();
+      }
+      return "";
+  }
+
+  String getClassPrefix() {
+      return getClassPrefix(protoFile);
+  }
+
   String getJavaPackage() {
     return getJavaPackage(protoFile);
   }
@@ -832,7 +844,7 @@ public class WireCompiler {
 
       MessageWriter messageWriter = new MessageWriter(this);
       messageWriter.emitHeader(writer, imports, datatypes, labels);
-      messageWriter.emitType(writer, type, protoFile.packageName() + ".", optionsMap, true);
+      messageWriter.emitType(writer, type, protoFile.packageName() + ".", optionsMap, true, getClassPrefix());
     } finally {
       if (writer != null) {
         writer.close();

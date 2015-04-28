@@ -119,7 +119,7 @@ public class MessageWriter {
     if (type instanceof MessageElement) {
       emitAll(writer, (MessageElement) type, optionsMap, topLevel);
       for (TypeElement nestedType : type.nestedElements()) {
-        emitType(writer, nestedType, currentType + nestedType.name() + ".", optionsMap, false);
+        emitType(writer, nestedType, currentType + nestedType.name() + ".", optionsMap, false, "");
       }
       writer.endType();
     } else if (type instanceof EnumElement) {
@@ -258,14 +258,14 @@ public class MessageWriter {
   }
 
   private void emitAll(JavaWriter writer, MessageElement messageType, Map<String, ?> optionsMap,
-      boolean topLevel)
+      boolean topLevel, String classPrefix)
       throws IOException {
     Set<Modifier> modifiers = EnumSet.of(PUBLIC, FINAL);
     if (!topLevel) {
       modifiers.add(STATIC);
     }
 
-    String name = messageType.name();
+    String name = classPrefix + messageType.name();
     emitDocumentation(writer, messageType.documentation());
     writer.beginType(name, "class", modifiers,
         compiler.hasExtensions(messageType) ? "ExtendableMessage<" + name + ">" : "Message");
@@ -275,14 +275,14 @@ public class MessageWriter {
     if (compiler.shouldEmitOptions()) {
       emitMessageFieldOptions(writer, messageType);
     }
-    emitMessageFieldDefaults(writer, messageType);
+    emitMessageFieldDefaults(writer, messageType, classPrefix);
     emitMessageFields(writer, messageType);
     emitMessageOneOfEnums(writer, messageType);
-    emitMessageFieldsConstructor(writer, messageType);
-    emitMessageBuilderConstructor(writer, messageType);
-    emitMessageEquals(writer, messageType);
+    emitMessageFieldsConstructor(writer, messageType, classPrefix);
+    emitMessageBuilderConstructor(writer, messageType, classPrefix);
+    emitMessageEquals(writer, messageType, classPrefix);
     emitMessageHashCode(writer, messageType);
-    emitBuilder(writer, messageType);
+    emitBuilder(writer, messageType, classPrefix);
   }
 
   private void emitMessageOptions(JavaWriter writer, Map<String, ?> optionsMap) throws IOException {
@@ -379,7 +379,7 @@ public class MessageWriter {
   //
   // public static final Integer DEFAULT_OPT_INT32 = 123;
   //
-  private void emitMessageFieldDefaults(JavaWriter writer, MessageElement messageType)
+  private void emitMessageFieldDefaults(JavaWriter writer, MessageElement messageType, String classPrefix)
       throws IOException {
     List<FieldElement> defaultFields = new ArrayList<FieldElement>();
     for (FieldElement field : allFields(messageType)) {
@@ -397,7 +397,7 @@ public class MessageWriter {
       String javaName = getJavaFieldType(messageType, field);
       if (javaName == null) {
         throw new WireCompilerException(
-            "Unknown type for field " + field + " in message " + messageType.name());
+            "Unknown type for field " + field + " in message " + classPrefix + messageType.name());
       }
       String defaultValue = getDefaultValue(messageType, field);
 
@@ -567,7 +567,7 @@ public class MessageWriter {
   //   this.optional_int64 = optional_int64;
   // }
   //
-  private void emitMessageFieldsConstructor(JavaWriter writer, MessageElement messageType)
+  private void emitMessageFieldsConstructor(JavaWriter writer, MessageElement messageType, String classPrefix)
       throws IOException {
     List<String> params = new ArrayList<String>();
     for (FieldElement field : allFields(messageType)) {
@@ -583,7 +583,7 @@ public class MessageWriter {
     }
 
     writer.emitEmptyLine();
-    writer.beginMethod(null, messageType.name(), EnumSet.of(PUBLIC), params, null);
+    writer.beginMethod(null, classPrefix + messageType.name(), EnumSet.of(PUBLIC), params, null);
     for (FieldElement field : allFields(messageType)) {
       String sanitizedName = sanitize(field.name());
       if (FieldInfo.isRepeated(field)) {
@@ -607,10 +607,10 @@ public class MessageWriter {
   //   setBuilder(builder);
   // }
   //
-  private void emitMessageBuilderConstructor(JavaWriter writer, MessageElement messageType)
+  private void emitMessageBuilderConstructor(JavaWriter writer, MessageElement messageType, String classPrefix)
       throws IOException {
     writer.emitEmptyLine();
-    writer.beginMethod(null, messageType.name(), EnumSet.of(PRIVATE), "Builder", "builder");
+    writer.beginMethod(null, classPrefix + messageType.name(), EnumSet.of(PRIVATE), "Builder", "builder");
     StringBuilder params = new StringBuilder();
     for (FieldElement field : allFields(messageType)) {
       if (params.length() > 0) {
@@ -644,24 +644,24 @@ public class MessageWriter {
   //   if (!Wire.equals(optional_int32, o.optional_int32)) return false;
   //   return true;
   //
-  private void emitMessageEquals(JavaWriter writer, MessageElement messageType) throws IOException {
+  private void emitMessageEquals(JavaWriter writer, MessageElement messageType, String classPrefix) throws IOException {
     writer.emitEmptyLine();
     writer.emitAnnotation(Override.class);
     writer.beginMethod("boolean", "equals", EnumSet.of(PUBLIC), "Object", "other");
 
     List<FieldElement> fields = allFields(messageType);
     if (fields.isEmpty()) {
-      writer.emitStatement("return other instanceof %s", messageType.name());
+      writer.emitStatement("return other instanceof %s", classPrefix + messageType.name());
     } else {
       writer.emitStatement("if (other == this) return true");
-      writer.emitStatement("if (!(other instanceof %s)) return false", messageType.name());
+      writer.emitStatement("if (!(other instanceof %s)) return false", classPrefix + messageType.name());
       if (hasOnlyOneField(messageType)) {
         String name = sanitize(fields.get(0).name());
         // If the field is named "other" or "o", qualify the field reference with 'this'
         writer.emitStatement("return equals(%1$s, ((%2$s) other).%3$s)",
-            addThisIfOneOf(name, "other", "o"), messageType.name(), name);
+            addThisIfOneOf(name, "other", "o"), classPrefix + messageType.name(), name);
       } else {
-        writer.emitStatement("%1$s o = (%1$s) other", messageType.name());
+        writer.emitStatement("%1$s o = (%1$s) other", classPrefix + messageType.name());
         if (compiler.hasExtensions(messageType)) {
           writer.emitStatement("if (!extensionsEqual(o)) return false");
         }
@@ -745,17 +745,17 @@ public class MessageWriter {
     return FieldInfo.isRepeated(field) ? 1 : 0;
   }
 
-  private void emitBuilder(JavaWriter writer, MessageElement messageType) throws IOException {
+  private void emitBuilder(JavaWriter writer, MessageElement messageType, String classPrefix) throws IOException {
     writer.emitEmptyLine();
     writer.beginType("Builder", "class", EnumSet.of(PUBLIC, STATIC, FINAL),
         (compiler.hasExtensions(messageType) ? "ExtendableBuilder<" : "Message.Builder<")
-            + messageType.name()
+            + classPrefix + messageType.name()
             + ">");
     emitBuilderFields(writer, messageType);
-    emitBuilderConstructors(writer, messageType);
+    emitBuilderConstructors(writer, messageType, classPrefix);
     emitBuilderSetters(writer, messageType);
-    if (compiler.hasExtensions(messageType)) emitBuilderSetExtension(writer, messageType);
-    emitBuilderBuild(writer, messageType);
+    if (compiler.hasExtensions(messageType)) emitBuilderSetExtension(writer, messageType, classPrefix);
+    emitBuilderBuild(writer, messageType, classPrefix);
     writer.endType();
   }
 
@@ -788,14 +788,14 @@ public class MessageWriter {
   //   ...
   // }
   //
-  private void emitBuilderConstructors(JavaWriter writer, MessageElement messageType)
+  private void emitBuilderConstructors(JavaWriter writer, MessageElement messageType, String classPrefix)
       throws IOException {
     writer.emitEmptyLine();
     writer.beginMethod(null, "Builder", EnumSet.of(PUBLIC));
     writer.endMethod();
 
     writer.emitEmptyLine();
-    writer.beginMethod(null, "Builder", EnumSet.of(PUBLIC), messageType.name(), "message");
+    writer.beginMethod(null, "Builder", EnumSet.of(PUBLIC), classPrefix + messageType.name(), "message");
     writer.emitStatement("super(message)");
     List<FieldElement> fields = allFields(messageType);
     if (!fields.isEmpty()) writer.emitStatement("if (message == null) return");
@@ -877,12 +877,12 @@ public class MessageWriter {
   //   return this;
   // }
   //
-  private void emitBuilderSetExtension(JavaWriter writer, MessageElement messageType)
+  private void emitBuilderSetExtension(JavaWriter writer, MessageElement messageType, String classPrefix)
       throws IOException {
     writer.emitEmptyLine();
     writer.emitAnnotation(Override.class);
     writer.beginMethod("<E> Builder", "setExtension", EnumSet.of(PUBLIC),
-        "Extension<" + messageType.name() + ", E>", "extension", "E", "value");
+        "Extension<" + classPrefix + messageType.name() + ", E>", "extension", "E", "value");
     writer.emitStatement("super.setExtension(extension, value)");
     writer.emitStatement("return this");
     writer.endMethod();
@@ -899,14 +899,14 @@ public class MessageWriter {
   // The call to checkRequiredFields will be emitted only if the message has
   // required fields.
   //
-  private void emitBuilderBuild(JavaWriter writer, MessageElement messageType) throws IOException {
+  private void emitBuilderBuild(JavaWriter writer, MessageElement messageType, String classPrefix) throws IOException {
     writer.emitEmptyLine();
     writer.emitAnnotation(Override.class);
-    writer.beginMethod(messageType.name(), "build", EnumSet.of(PUBLIC));
+    writer.beginMethod(classPrefix + messageType.name(), "build", EnumSet.of(PUBLIC));
     if (hasRequiredFields(messageType)) {
       writer.emitStatement("checkRequiredFields()");
     }
-    writer.emitStatement("return new %s(this)", messageType.name());
+    writer.emitStatement("return new %s(this)", classPrefix + messageType.name());
     writer.endMethod();
   }
 
