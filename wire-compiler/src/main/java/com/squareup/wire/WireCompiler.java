@@ -673,9 +673,9 @@ public class WireCompiler {
   }
 
   String getClassPrefix(ProtoFile protoFile) {
-      Option classPrefix = Option.findByName(protoFile.getOptions(), "java_class_prefix");
+      OptionElement classPrefix = OptionElement.findByName(protoFile.options(), "java_class_prefix");
       if (classPrefix != null) {
-          return (String) classPrefix.getValue();
+          return (String) classPrefix.value();
       }
       return "";
   }
@@ -1049,8 +1049,8 @@ public class WireCompiler {
       for (FieldElement field : extend.fields()) {
         String fieldType = field.type().toString();
         String type = javaName(null, fieldType);
-        String fqName = prefixWithPackageName(field.getName());
-        String typeWithClassPrefix = fullyQualifiedJavaName(null, field.getType());
+        String fqName = prefixWithPackageName(field.name());
+        String typeWithClassPrefix = fullyQualifiedJavaName(null, field.type().toString());
         if (fqName.startsWith("services")) {
             String[] parts = typeWithClassPrefix.split("\\.");
             String output = new String();
@@ -1072,7 +1072,6 @@ public class WireCompiler {
         String initialValue;
         String className = writer.compressType(name);
         String extensionName = ", " + typeWithClassPrefix + "> " + field.name();
-        String fqName = prefixWithPackageName(field.name());
         int tag = field.tag();
 
         boolean isScalar = TypeInfo.isScalar(fieldType);

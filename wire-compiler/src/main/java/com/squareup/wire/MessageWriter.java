@@ -114,10 +114,10 @@ public class MessageWriter {
   }
 
   public void emitType(JavaWriter writer, TypeElement type, String currentType,
-      Map<String, ?> optionsMap, boolean topLevel) throws IOException {
+      Map<String, ?> optionsMap, boolean topLevel, String classPrefix) throws IOException {
     writer.emitEmptyLine();
     if (type instanceof MessageElement) {
-      emitAll(writer, (MessageElement) type, optionsMap, topLevel);
+      emitAll(writer, (MessageElement) type, optionsMap, topLevel, classPrefix);
       for (TypeElement nestedType : type.nestedElements()) {
         emitType(writer, nestedType, currentType + nestedType.name() + ".", optionsMap, false, "");
       }
