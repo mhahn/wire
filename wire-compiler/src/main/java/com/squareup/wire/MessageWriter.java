@@ -406,6 +406,20 @@ public class MessageWriter {
     }
   }
 
+  private static String toCamelCase(String s){
+     String[] parts = s.split("_");
+     String camelCaseString = "";
+     for (String part : parts){
+        camelCaseString = camelCaseString + toProperCase(part);
+     }
+     return camelCaseString;
+  }
+
+  private static String toProperCase(String s) {
+      return s.substring(0, 1).toUpperCase() +
+                 s.substring(1).toLowerCase();
+  }
+
   // Example:
   //
   // /**
@@ -427,6 +441,22 @@ public class MessageWriter {
       String javaName = compiler.javaName(messageType, fieldType);
       Map<String, String> map = new LinkedHashMap<String, String>();
       map.put("tag", String.valueOf(tag));
+      if (fieldType.startsWith("services") && fieldType.indexOf(".actions") > -1) {
+          String[] parts = fieldType.split("\\.");
+          if (parts.length >= 5) {
+              String output = new String();
+              for (int i = 3; i < parts.length; i++) {
+                  String part = parts[i];
+                  if (i == 4) {
+                      output += toCamelCase(parts[i - 1]) + part;
+                      output += ".";
+                  } else if (i == 5) {
+                      output += part;
+                  }
+              }
+              javaName = output;
+          }
+      }
 
       boolean isScalar = false;
       boolean isEnum = false;
@@ -923,6 +953,23 @@ public class MessageWriter {
     if (FieldInfo.isRepeated(field)) return "Collections.emptyList()";
     OptionElement defaultOption = field.getDefault();
     String javaName = compiler.javaName(messageType, field.type().toString());
+    String fieldType = field.type().toString();
+    if (fieldType.startsWith("services") && fieldType.indexOf(".actions") > -1) {
+        String[] parts = fieldType.split("\\.");
+        if (parts.length >= 5) {
+            String output = new String();
+            for (int i = 3; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == 4) {
+                    output += toCamelCase(parts[i - 1]) + part;
+                    output += ".";
+                } else if (i == 5) {
+                    output += part;
+                }
+            }
+            javaName = output;
+        }
+    }
     if (TypeInfo.isScalar(field.type().toString())) {
       Object initialValue = defaultOption != null ? defaultOption.value() : null;
       return compiler.getInitializerForType(initialValue, javaName);
@@ -950,6 +997,23 @@ public class MessageWriter {
       FieldElement field) {
     String javaName = compiler.javaName(protoFile, messageType, field.type().toString());
     if (FieldInfo.isRepeated(field)) javaName = "List<" + javaName + ">";
+    String fieldType = field.type().toString();
+    if (fieldType.startsWith("services") && fieldType.indexOf(".actions") > -1) {
+        String[] parts = fieldType.split("\\.");
+        if (parts.length >= 5) {
+            String output = new String();
+            for (int i = 3; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == 4) {
+                    output += toCamelCase(parts[i - 1]) + part;
+                    output += ".";
+                } else if (i == 5) {
+                    output += part;
+                }
+            }
+            javaName = output;
+        }
+    }
     return javaName;
   }
 

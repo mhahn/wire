@@ -895,6 +895,20 @@ public class WireCompiler {
         }
         if (fullyQualifiedNameIsOutsidePackage(fqName)) {
           fqName = getTopLevelMessageName(fqName);
+          if (fqName.startsWith("com.rhlabs") && fqName.indexOf(".actions") > -1) {
+              String[] parts = fqName.split("\\.");
+              String output = new String();
+              for (int i = 0; i < parts.length; i++) {
+                  String part = parts[i];
+                  if (i == parts.length - 1) {
+                      output += toCamelCase(parts[i - 1]) + part;
+                  } else {
+                      output += part;
+                      output += ".";
+                  }
+              }
+              fqName = output;
+          }
           types.add(fqName);
         }
         String parentType = removeTrailingSegment(fqName);
